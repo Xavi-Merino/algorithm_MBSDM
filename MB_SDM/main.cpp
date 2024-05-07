@@ -83,7 +83,7 @@ double meanCrosstalk(int n, double L, double k, double r, double b, double w)
     double numerator = n - n * (exp(-(n + 1) * 2 * h * L * 1000));
     double denominator = 1 + n * (exp(-(n + 1) * 2 * h * L * 1000));
     double XT = numerator / denominator;
-    return std::log10(XT)*10; // a este truco se re feria mirko?? esto para obtener -infinito cuando XT es 0??
+    return std::log10(XT)*10; 
     // std::cout << numerator << ", " << denominator << ", " << n << ", " << XT << "\n";
     
 
@@ -300,7 +300,7 @@ BEGIN_ALLOC_FUNCTION(MCMB_DA){
             numberOfSlots = reqSlotsPerBand;
             currentSlotIndex = bands[orderOfBands[b]].first;
 
-            for(int s = bands[orderOfBands[b]].first; s < bands[orderOfBands[b]].second; s++){ //buscamos los slots necesarios en las bandas
+            for(int s = bands[orderOfBands[b]].first; s < bands[orderOfBands[b]].second; s++){ //buscamos los slots necesarios en las bandas utilizando FF
               if(totalSlots[s] == false){
                 currentNumberSlots++;
                 }
