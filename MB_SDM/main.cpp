@@ -61,7 +61,7 @@ double maxRouteLength = 0;
 // maximum crosstalk
 typedef std::map<std::string, double> modulationMap ;
 modulationMap maxXT_perModulation = {{"BPSK", -99}, {"QPSK", -99}, {"8QAM", -99}, {"16QAM", -99}};
-double currentXT = 0;
+double totalXT = 0;
 
 // modulation used for each max XT
 std::string modulationStringUsedInXT;
@@ -83,7 +83,7 @@ double meanCrosstalk(int n, double L, double k, double r, double b, double w)
     double numerator = n - n * (exp(-(n + 1) * 2 * h * L * 1000));
     double denominator = 1 + n * (exp(-(n + 1) * 2 * h * L * 1000));
     double XT = numerator / denominator;
-    return std::log10(XT)*10; 
+    return (XT); 
     // std::cout << numerator << ", " << denominator << ", " << n << ", " << XT << "\n";
     
 
@@ -130,6 +130,7 @@ bool isOverThreshold(int coreIndex, std::vector<Link *> links, int reqSlots, int
     int slotEnd = reqSlots + slotBegin - 1;
     int activeNeighboursCurrent = 0;
     int activeNeighbours = 0;
+    double currentXT = 0;
 
     for (int l = 0; l < links.size(); l++) {
       for (int s = slotBegin; s < slotEnd; s++) {
@@ -154,12 +155,14 @@ bool isOverThreshold(int coreIndex, std::vector<Link *> links, int reqSlots, int
                   break;
               }
             }
+            currentXT = meanCrosstalk(activeNeighbours, routeLength, k, r, b, w);
+            totalXT += currentXT;
           }
         }
       }
     }
-    currentXT = meanCrosstalk(activeNeighbours, routeLength, k, r, b, w); // por que aca no se hace una sumatoria del crosstalk de cada slot ocupado por el vecino???
-    if (currentXT >  XT_Threshold + EPSILON) {
+    // totalXT = meanCrosstalk(activeNeighbours, routeLength, k, r, b, w); // por que aca no se hace una sumatoria del crosstalk de cada slot ocupado por el vecino???
+    if (std::log10(totalXT)*10 >  XT_Threshold + EPSILON) {
         blocked_by_XT++;
         return true;
     }
@@ -293,7 +296,7 @@ BEGIN_ALLOC_FUNCTION(MCMB_DA){
           std::string modString = modulationString(REQ_BITRATE,m);
           reqReachPerBand = requiredReachPerBand(requiredBitrate, modString, orderOfBands[b]);
           reqSlotsPerBand = requiredslotsPerBand(requiredBitrate, modString, orderOfBands[b]);
-          currentXT = 0;
+          totalXT = 0;
           
           if (routeLength <= reqReachPerBand){
               
@@ -320,8 +323,8 @@ BEGIN_ALLOC_FUNCTION(MCMB_DA){
                   currentUtilization = currentUtilization + (numberOfSlots * NUMBER_OF_LINKS(r));
                   if (currentUtilization/totalCapacity > maxUtilization) maxUtilization = currentUtilization/totalCapacity;
                   
-                  if (currentXT > maxXT_perModulation[modString]) {
-                    maxXT_perModulation[modString] = currentXT;
+                  if (totalXT > maxXT_perModulation[modString]) {
+                    maxXT_perModulation[modString] = totalXT;
                     modulationStringUsedInXT = modString;
                     } // esto para tener el mayor XT de cada modulación en la
                   return ALLOCATED; 
