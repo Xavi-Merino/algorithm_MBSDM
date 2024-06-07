@@ -6,6 +6,8 @@
 
 // ############################## Setup Global Variables #################################
 
+std::vector<std::string> networks = {"NSFNet", "Eurocore", "UKnet"};
+std::string currentNetwork = networks[2];
 int numberConnections = 1e5; // (requests)
 
 // Traffic loads
@@ -20,7 +22,7 @@ int const number_of_cores = 7;
 int const SlotsPerCore = 2720
 ;
 // Total capacity network: (number of links * number of cores * NUMBER OF SLOTS PER CORE)
-double totalCapacity = 44 * number_of_cores * SlotsPerCore;
+double totalCapacity = 78 * number_of_cores * SlotsPerCore;
 
 // (XT)
 // coupling coefficient (k)
@@ -62,6 +64,7 @@ double maxRouteLength = 0;
 typedef std::map<std::string, double> modulationMap ;
 modulationMap maxXT_perModulation = {{"BPSK", -99}, {"QPSK", -99}, {"8QAM", -99}, {"16QAM", -99}};
 double totalXT = 0;
+double totalXTdbm = 0;
 
 // modulation used for each max XT
 std::string modulationStringUsedInXT;
@@ -85,8 +88,6 @@ double meanCrosstalk(int n, double L, double k, double r, double b, double w)
     double XT = numerator / denominator;
     return (XT); 
     // std::cout << numerator << ", " << denominator << ", " << n << ", " << XT << "\n";
-    
-
 }
 
 // Add edge into the adjacency matrix
@@ -162,8 +163,8 @@ bool isOverThreshold(int coreIndex, std::vector<Link *> links, int reqSlots, int
       }
     }
     // totalXT = meanCrosstalk(activeNeighbours, routeLength, k, r, b, w); // por que aca no se hace una sumatoria del crosstalk de cada slot ocupado por el vecino???
-    if (std::log10(totalXT)*10 >  XT_Threshold + EPSILON) {
-        blocked_by_XT++;
+    totalXTdbm = 10 * std::log10(totalXT);
+    if (totalXTdbm >  XT_Threshold + EPSILON) {
         return true;
     }
     return false;
@@ -179,25 +180,12 @@ double bitrateCountBlocked[bitrateNumber] = {0.0, 0.0, 0.0, 0.0, 0.0};
 double meanWeightBitrate[bitrateNumber] = {1.0, 1.83, 3.5, 13.33, 32.83}; //DE DONDE SALEN ESTOS PESOS?????
 
 // Result to TXT
-void resultsToFile(std::fstream &output, double BBP, double BP, double confidenceInterval, int lambda_index,
-                    double erlang, double maxUtilization, double blocked_by_XT, double time_elapsed_ms)
-{
-  output << "erlang index: " << lambda_index
-          << ", erlang: " << erlang
-          << ", general blocking: " << BP
-          << ", BBP: " << BBP
-          << ", Confidence interval: " << confidenceInterval
-          << ", Total current utilization: " << maxUtilization
-          << ", Blocked by XT: " << blocked_by_XT
-          << ", CPU time: " << time_elapsed_ms      
-          << ", ruta mas larga: " << maxRouteLength        
-          << std::endl;
-}
 
 void XTresultsToFile(std::fstream &output, double BBP, double BP, int lambda_index,
                     double erlang, double maxUtilization, double blocked_by_XT, modulationMap maxXT_perModulation)
 {
-  output << "erlang index: " << lambda_index
+  output  << "erlang index,erlang,general blocking,BBP,Total current utilization,Blocked by XT,Ruta mas larga,Max XT for modulation BPSK,Max XT for modulation QPSK,Max XT for modulation 8QAM,Max XT for modulation 16QAM\n"
+          << "erlang index: " << lambda_index
           << ", erlang: " << erlang
           << ", general blocking: " << BP
           << ", BBP: " << BBP
@@ -210,7 +198,6 @@ void XTresultsToFile(std::fstream &output, double BBP, double BP, int lambda_ind
   output << std::endl;
 }
 
-// Bitrate map(POR QUE SE HACE ESTO????, ES PARA)
 std::map<float, int> bitRates_map {{ 10.0 , 0 }, { 40.0 , 1 }, { 100.0 , 2 }, { 400.0 , 3 }, {1000.0, 4}};
 
 
@@ -290,7 +277,7 @@ BEGIN_ALLOC_FUNCTION(MCMB_DA){
       }
       
       for (int b = 0; b < orderOfBands.size();b++){ // recorremos las bandas en el orden definido
-        for (int m = numberOfModulations(bitratesJS)-1; m >= 0; m--) { // recorremos las modulaciones desde la mas alta a la mas baja
+        for (int m = numberOfModulations(bitratesJS)-1; m >= 0; m--) { // recorremos las modulaciones desde la mas eficiente a la menos eficiente
           currentNumberSlots = 0;
           int requiredBitrate = REQ_BITRATE;
           std::string modString = modulationString(REQ_BITRATE,m);
@@ -298,7 +285,7 @@ BEGIN_ALLOC_FUNCTION(MCMB_DA){
           reqSlotsPerBand = requiredslotsPerBand(requiredBitrate, modString, orderOfBands[b]);
           totalXT = 0;
           
-          if (routeLength <= reqReachPerBand){
+          if (routeLength <= reqReachPerBand){ // verificamos si la distancia de la ruta es menor a la distancia maxima de la modulacion m en la banda b
               
             numberOfSlots = reqSlotsPerBand;
             currentSlotIndex = bands[orderOfBands[b]].first;
@@ -323,8 +310,8 @@ BEGIN_ALLOC_FUNCTION(MCMB_DA){
                   currentUtilization = currentUtilization + (numberOfSlots * NUMBER_OF_LINKS(r));
                   if (currentUtilization/totalCapacity > maxUtilization) maxUtilization = currentUtilization/totalCapacity;
                   
-                  if (totalXT > maxXT_perModulation[modString]) {
-                    maxXT_perModulation[modString] = totalXT;
+                  if (totalXTdbm > maxXT_perModulation[modString]) {
+                    maxXT_perModulation[modString] = totalXTdbm;
                     modulationStringUsedInXT = modString;
                     } // esto para tener el mayor XT de cada modulación en la
                   return ALLOCATED; 
@@ -335,7 +322,7 @@ BEGIN_ALLOC_FUNCTION(MCMB_DA){
               }
             }
           }
-          else{
+          else{ // probamos con la siguiente modulación en la misma banda
             continue;
           }
         }
@@ -343,6 +330,9 @@ BEGIN_ALLOC_FUNCTION(MCMB_DA){
     }
   }
   bitrateCountBlocked[bitrateInt] += 1;
+  if (totalXTdbm > XT_Threshold_by_bitrate[3] + EPSILON) { //chequeamos si fue bloqueado por XT
+    blocked_by_XT++;
+  }
   return NOT_ALLOCATED;
 }
 END_ALLOC_FUNCTION
@@ -384,8 +374,8 @@ int main(int argc, char* argv[]) {
   for (int lambda = 0; lambda < 100; lambda++) {
 
     // Simulator object
-    sim = Simulator(std::string("./networks/NSFNet.json"),                      // Network nodes, links and cores
-                    std::string("./networks/NSFNet_routes.json"),               // Network Routes
+    sim = Simulator(std::string("./networks/").append(currentNetwork).append(".json"), // Network nodes, links and cores
+                    std::string("./networks/").append(currentNetwork).append("_routes.json"),  // Network Routes
                     std::string("./networks/bitratesSDM.json"),                    // BitRates (eg. BPSK)
                     SDM);                                                       // Network type (SDM, EON)
                                              
@@ -411,25 +401,22 @@ int main(int argc, char* argv[]) {
     double time_elapsed_ms = 1000.0 * (c_end-c_start) / CLOCKS_PER_SEC;
 
 // ############################## Out results #################################
-
-    std::fstream simulationOutput;
-    simulationOutput.open("./out/SDM-NSFNet.txt", std::ios::out | std::ios::app);
-
+    std::string outputFileName = "./out/resultados";
+  
     double BBP_results;
     double confidenceInterval =  sim.wilsonCI();
     BBP_results = bandwidthBlockingProbability(bitrateCountTotal, bitrateCountBlocked, meanWeightBitrate);
     currentUtilization = currentUtilization/totalCapacity;
 
-    resultsToFile(simulationOutput, BBP_results, sim.getBlockingProbability(), confidenceInterval,
-                  lambda, lambdas[lambda], maxUtilization, blocked_by_XT, time_elapsed_ms); 
-    
     std::fstream XTsimulationOutput;
-    XTsimulationOutput.open("./out/SDM-NSFNet_XToutput.txt", std::ios::out | std::ios::app);
+    XTsimulationOutput.open(std::string("./out/resultados").append(currentNetwork).append(".txt"), std::ios::out | std::ios::app);
 
-    XTresultsToFile(XTsimulationOutput, BBP_results, sim.getBlockingProbability(), lambda, lambdas[lambda], maxUtilization, blocked_by_XT, maxXT_perModulation);
+    XTresultsToFile(XTsimulationOutput, BBP_results, sim.getBlockingProbability(), lambda, lambdas[lambda], 
+                    maxUtilization, blocked_by_XT, maxXT_perModulation);
+    
 // ############################## reset metric variables #################################
 
-    for (int b = 0; b < 3; b++){
+    for (int b = 0; b < 5; b++){
       bitrateCountTotal[b] = 0.0;
       bitrateCountBlocked[b] = 0.0;
     }

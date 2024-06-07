@@ -198,3 +198,4 @@ erlang index: 96, erlang: 97000, general blocking: 0.178208, BBP: 0.292694, Conf
 erlang index: 97, erlang: 98000, general blocking: 0.177618, BBP: 0.294186, Confidence interval: 0.00236877, Total current utilization: 0.535382, Blocked by XT: 41709, CPU time: 574926, ruta mas larga: 12700
 erlang index: 98, erlang: 99000, general blocking: 0.178528, BBP: 0.295416, Confidence interval: 0.00237352, Total current utilization: 0.536557, Blocked by XT: 36451, CPU time: 565090, ruta mas larga: 12700
 erlang index: 99, erlang: 100000, general blocking: 0.179468, BBP: 0.296927, Confidence interval: 0.0023784, Total current utilization: 0.537912, Blocked by XT: 39562, CPU time: 577327, ruta mas larga: 12700
+erlang index: 0, erlang: 1000, general blocking: 0, BBP: 0, Confidence interval: 1.92063e-05, Total current utilization: 0.0270686, Blocked by XT: 0, CPU time: 14971.9, ruta mas larga: 9700
